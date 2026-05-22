@@ -4,10 +4,11 @@ A lightweight Windows desktop click-effect overlay inspired by Blue Archive's ex
 
 When the user left-clicks, the executable draws a short blue burst effect at the cursor position via a transparent click-through overlay. The executable lives in system tray. As of V1.0, it is possible to load this on startup natively.
 
-## Features (V1.0)
+## Features
 
 - Visual click effect inspired (not a 1-1 copy) by Blue Archive's touch fx.
-- Start with Windows toggle
+- Start with Windows toggle#
+- Automatic color modes (Light / Dark)
 - `Ctrl + Alt + Q` emergency quit shortcut if needed.
 - Lightweight rendering using a custom WPF drawing surface
 

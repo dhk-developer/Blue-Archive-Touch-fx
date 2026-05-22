@@ -300,7 +300,7 @@ namespace BlueArchiveTouchFx
             private const int MaxEnergyArcs = 3;
 
             private const int ArcSegmentCount = 9;
-            private const double SmallestArcRadius = 24.0;
+            private const double SmallestArcRadius = 36.0;
 
             private static readonly Brush BrightBlueBrush = CreateBrush(Color.FromArgb(235, 110, 235, 255));
             private static readonly Brush SoftBlueBrush = CreateBrush(Color.FromArgb(220, 145, 240, 255));
@@ -390,7 +390,7 @@ namespace BlueArchiveTouchFx
                 for (int i = 0; i < count; i++)
                 {
                     double angle = _random.NextDouble() * Math.PI * 2.0;
-                    double speed = 120 + _random.NextDouble() * 170;
+                    double speed = 120 + _random.NextDouble() * 255;
                     double life = 0.23 + _random.NextDouble() * 0.13;
 
                     _burstParticles.Add(new BurstParticle
@@ -424,8 +424,8 @@ namespace BlueArchiveTouchFx
                 {
                     X = x,
                     Y = y,
-                    Radius = SmallestArcRadius + _random.NextDouble() * 7.0,
-                    ExpansionSpeed = 75 + _random.NextDouble() * 30,
+                    Radius = SmallestArcRadius + _random.NextDouble() * 10.5,
+                    ExpansionSpeed = (75 + _random.NextDouble() * 30)*1.5,
                     StartAngle = -40 + _random.NextDouble() * 30,
                     SweepAngle = 95 + _random.NextDouble() * 40,
                     Rotation = _random.NextDouble() * 360.0,

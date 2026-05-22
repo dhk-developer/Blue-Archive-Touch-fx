@@ -1,5 +1,12 @@
 # Release Notes
 
+## v0.1.1
+
+### Changed
+
+- Increased click effect radius and spread by approximately 1.5x.
+
+
 ## v1.0
 
 Initial release.

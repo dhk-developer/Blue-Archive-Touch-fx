@@ -14,11 +14,11 @@ When the user left-clicks, the executable draws a short blue burst effect at the
 ## Requirements
 
 - Windows 10 or Windows 11
-- .NET installation (should be native), if not will download as part of self-install.
 
 ## Installation
 
 Download the latest release and run the executable.
+If you are unsure which one to download, choose the standalone version. This will self-install a .NET dependency.
 
 The app will appear in the system tray. Right-click the tray icon to access:
 

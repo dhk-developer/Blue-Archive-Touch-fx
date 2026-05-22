@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.1.2
+
+### Changed
+
+- Added automatic light/dark Windows theme detection.
+- Added higher-contrast light mode colours for better visibility on bright backgrounds.
+
+
 ## v0.1.1
 
 ### Changed

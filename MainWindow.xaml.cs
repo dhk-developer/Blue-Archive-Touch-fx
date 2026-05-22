@@ -12,6 +12,12 @@ using Forms = System.Windows.Forms;
 
 namespace BlueArchiveTouchFx
 {
+    internal enum EffectTheme
+    {
+        Dark,
+        Light
+    }
+
     public partial class MainWindow : Window
     {
         private const string AppName = "Blue-Archive-Touch-fx";
@@ -25,6 +31,9 @@ namespace BlueArchiveTouchFx
         private HwndSource? _windowSource;
         private LowLevelMouseProc? _mouseProc;
         private Forms.NotifyIcon? _trayIcon;
+        private Forms.ToolStripMenuItem? _startupMenuItem;
+
+        private EffectTheme _theme = EffectTheme.Dark;
 
         private const int QuitHotkeyId = 1;
 
@@ -43,6 +52,9 @@ namespace BlueArchiveTouchFx
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
+            _theme = DetectWindowsTheme();
+            _effectSurface.SetTheme(_theme);
+
             OverlayCanvas.IsHitTestVisible = false;
             OverlayCanvas.SnapsToDevicePixels = true;
 
@@ -57,12 +69,16 @@ namespace BlueArchiveTouchFx
             CreateTrayIcon();
             EnableStartupOnLaunch();
 
+            SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+
             _mouseProc = MouseHookCallback;
             _mouseHookId = SetMouseHook(_mouseProc);
         }
 
         private void OnClosed(object? sender, EventArgs e)
         {
+            SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+
             _effectSurface.Stop();
 
             if (_mouseHookId != IntPtr.Zero)
@@ -113,15 +129,15 @@ namespace BlueArchiveTouchFx
 
         private void CreateTrayIcon()
         {
-            Forms.ToolStripMenuItem startupMenuItem = new("Start with Windows")
+            _startupMenuItem = new Forms.ToolStripMenuItem("Start with Windows")
             {
                 Checked = IsStartupEnabled(),
                 CheckOnClick = true
             };
 
-            startupMenuItem.CheckedChanged += (_, _) =>
+            _startupMenuItem.CheckedChanged += (_, _) =>
             {
-                if (startupMenuItem.Checked)
+                if (_startupMenuItem.Checked)
                 {
                     EnableStartup();
                 }
@@ -135,7 +151,7 @@ namespace BlueArchiveTouchFx
             exitMenuItem.Click += (_, _) => Close();
 
             Forms.ContextMenuStrip menu = new();
-            menu.Items.Add(startupMenuItem);
+            menu.Items.Add(_startupMenuItem);
             menu.Items.Add(new Forms.ToolStripSeparator());
             menu.Items.Add(exitMenuItem);
 
@@ -150,6 +166,48 @@ namespace BlueArchiveTouchFx
             _trayIcon.DoubleClick += (_, _) => Close();
         }
 
+        private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            if (e.Category != UserPreferenceCategory.General &&
+                e.Category != UserPreferenceCategory.VisualStyle)
+            {
+                return;
+            }
+
+            Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                new Action(() =>
+                {
+                    EffectTheme detectedTheme = DetectWindowsTheme();
+
+                    if (detectedTheme == _theme)
+                    {
+                        return;
+                    }
+
+                    _theme = detectedTheme;
+                    _effectSurface.SetTheme(_theme);
+                }));
+        }
+
+        private static EffectTheme DetectWindowsTheme()
+        {
+            const string personalisationPath =
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+
+            using RegistryKey? key = Registry.CurrentUser.OpenSubKey(personalisationPath, false);
+            object? value = key?.GetValue("AppsUseLightTheme");
+
+            if (value is int appsUseLightTheme)
+            {
+                return appsUseLightTheme == 0
+                    ? EffectTheme.Dark
+                    : EffectTheme.Light;
+            }
+
+            return EffectTheme.Dark;
+        }
+
         private static System.Drawing.Icon LoadTrayIcon()
         {
             string? executablePath = Environment.ProcessPath;
@@ -161,7 +219,8 @@ namespace BlueArchiveTouchFx
 
             if (!string.IsNullOrWhiteSpace(executablePath))
             {
-                System.Drawing.Icon? extractedIcon = System.Drawing.Icon.ExtractAssociatedIcon(executablePath);
+                System.Drawing.Icon? extractedIcon =
+                    System.Drawing.Icon.ExtractAssociatedIcon(executablePath);
 
                 if (extractedIcon != null)
                 {
@@ -177,6 +236,11 @@ namespace BlueArchiveTouchFx
             if (!IsStartupEnabled())
             {
                 EnableStartup();
+            }
+
+            if (_startupMenuItem != null)
+            {
+                _startupMenuItem.Checked = IsStartupEnabled();
             }
         }
 
@@ -290,37 +354,49 @@ namespace BlueArchiveTouchFx
 
             private readonly Stopwatch _timer = Stopwatch.StartNew();
 
+            private EffectTheme _theme = EffectTheme.Dark;
             private double _lastFrameSeconds;
             private bool _isRendering;
 
-            private const int BaseBurstCount = 7;
+            private const double EffectScale = 1.5;
 
+            private const int BaseBurstCount = 7;
             private const int MaxBurstParticles = 32;
             private const int MaxPulseParticles = 3;
             private const int MaxEnergyArcs = 3;
 
             private const int ArcSegmentCount = 9;
-            private const double SmallestArcRadius = 36.0;
+            private const double SmallestArcRadius = 24.0 * EffectScale;
 
-            private static readonly Brush BrightBlueBrush = CreateBrush(Color.FromArgb(235, 110, 235, 255));
-            private static readonly Brush SoftBlueBrush = CreateBrush(Color.FromArgb(220, 145, 240, 255));
-            private static readonly Brush PaleBlueBrush = CreateBrush(Color.FromArgb(210, 185, 245, 255));
-            private static readonly Brush BlueWhiteBrush = CreateBrush(Color.FromArgb(225, 225, 250, 255));
-            private static readonly Brush NearWhiteBrush = CreateBrush(Color.FromArgb(235, 245, 252, 255));
+            private static readonly ThemePalette DarkPalette = CreateThemePalette(
+                new Color[]
+                {
+                    Color.FromArgb(235, 110, 235, 255),
+                    Color.FromArgb(220, 145, 240, 255),
+                    Color.FromArgb(210, 185, 245, 255),
+                    Color.FromArgb(225, 225, 250, 255),
+                    Color.FromArgb(235, 245, 252, 255)
+                },
+                pulseFill: Color.FromArgb(42, 140, 225, 255),
+                pulseStroke: Color.FromArgb(75, 180, 240, 255),
+                arcBloom: Color.FromArgb(90, 90, 225, 255),
+                primaryArc: Color.FromArgb(235, 110, 235, 255),
+                secondaryArc: Color.FromArgb(225, 225, 250, 255));
 
-            private static readonly Brush PulseFillBrush = CreateBrush(Color.FromArgb(42, 140, 225, 255));
-            private static readonly Brush ArcBloomBrush = CreateBrush(Color.FromArgb(90, 90, 225, 255));
-
-            private static readonly Pen PulseStrokePen = CreatePen(Color.FromArgb(75, 180, 240, 255), 1.0);
-
-            private static readonly ParticleStyle[] ParticleStyles =
-            {
-                CreateParticleStyle(BrightBlueBrush),
-                CreateParticleStyle(SoftBlueBrush),
-                CreateParticleStyle(PaleBlueBrush),
-                CreateParticleStyle(BlueWhiteBrush),
-                CreateParticleStyle(NearWhiteBrush)
-            };
+            private static readonly ThemePalette LightPalette = CreateThemePalette(
+                new Color[]
+                {
+                    Color.FromArgb(245, 0, 150, 190),   // clear teal-blue
+                    Color.FromArgb(235, 0, 170, 205),   // brighter cyan-teal
+                    Color.FromArgb(225, 25, 135, 190),  // medium contrast blue-teal
+                    Color.FromArgb(235, 0, 125, 175),   // deeper teal for visibility
+                    Color.FromArgb(220, 60, 180, 215)   // softer BA-style cyan
+                },
+                pulseFill: Color.FromArgb(58, 0, 165, 205),
+                pulseStroke: Color.FromArgb(125, 0, 130, 185),
+                arcBloom: Color.FromArgb(115, 0, 165, 210),
+                primaryArc: Color.FromArgb(245, 0, 180, 220),
+                secondaryArc: Color.FromArgb(235, 0, 135, 190));
 
             public ClickEffectSurface()
             {
@@ -329,11 +405,19 @@ namespace BlueArchiveTouchFx
                 UseLayoutRounding = true;
             }
 
+            public void SetTheme(EffectTheme theme)
+            {
+                _theme = theme;
+                InvalidateVisual();
+            }
+
             public void SpawnClickEffect(double x, double y)
             {
-                SpawnPulse(x, y);
-                SpawnBurst(x, y);
-                SpawnEnergyArc(x, y);
+                ThemePalette palette = CurrentPalette;
+
+                SpawnPulse(x, y, palette);
+                SpawnBurst(x, y, palette);
+                SpawnEnergyArc(x, y, palette);
 
                 StartRendering();
                 InvalidateVisual();
@@ -359,7 +443,10 @@ namespace BlueArchiveTouchFx
                 DrawBurstParticles(drawingContext);
             }
 
-            private void SpawnPulse(double x, double y)
+            private ThemePalette CurrentPalette =>
+                _theme == EffectTheme.Light ? LightPalette : DarkPalette;
+
+            private void SpawnPulse(double x, double y, ThemePalette palette)
             {
                 if (_pulseParticles.Count >= MaxPulseParticles)
                 {
@@ -371,13 +458,15 @@ namespace BlueArchiveTouchFx
                     X = x,
                     Y = y,
                     Radius = SmallestArcRadius,
-                    GrowthSpeed = 30.0,
+                    GrowthSpeed = 30.0 * EffectScale,
                     Life = 0.16,
-                    MaxLife = 0.16
+                    MaxLife = 0.16,
+                    FillBrush = palette.PulseFillBrush,
+                    StrokePen = palette.PulseStrokePen
                 });
             }
 
-            private void SpawnBurst(double x, double y)
+            private void SpawnBurst(double x, double y, ThemePalette palette)
             {
                 int availableSlots = MaxBurstParticles - _burstParticles.Count;
                 int count = Math.Min(BaseBurstCount, Math.Max(availableSlots, 0));
@@ -390,7 +479,7 @@ namespace BlueArchiveTouchFx
                 for (int i = 0; i < count; i++)
                 {
                     double angle = _random.NextDouble() * Math.PI * 2.0;
-                    double speed = 120 + _random.NextDouble() * 255;
+                    double speed = (120 + _random.NextDouble() * 170) * EffectScale;
                     double life = 0.23 + _random.NextDouble() * 0.13;
 
                     _burstParticles.Add(new BurstParticle
@@ -406,12 +495,12 @@ namespace BlueArchiveTouchFx
                         MaxLife = life,
                         IsTriangle = _random.NextDouble() < 0.55,
                         IsFilled = _random.NextDouble() < 0.35,
-                        Style = PickParticleStyle()
+                        Style = PickParticleStyle(palette)
                     });
                 }
             }
 
-            private void SpawnEnergyArc(double x, double y)
+            private void SpawnEnergyArc(double x, double y, ThemePalette palette)
             {
                 if (_energyArcs.Count >= MaxEnergyArcs)
                 {
@@ -424,8 +513,8 @@ namespace BlueArchiveTouchFx
                 {
                     X = x,
                     Y = y,
-                    Radius = SmallestArcRadius + _random.NextDouble() * 10.5,
-                    ExpansionSpeed = (75 + _random.NextDouble() * 30)*1.5,
+                    Radius = SmallestArcRadius + _random.NextDouble() * (7.0 * EffectScale),
+                    ExpansionSpeed = (75 + _random.NextDouble() * 30) * EffectScale,
                     StartAngle = -40 + _random.NextDouble() * 30,
                     SweepAngle = 95 + _random.NextDouble() * 40,
                     Rotation = _random.NextDouble() * 360.0,
@@ -433,7 +522,10 @@ namespace BlueArchiveTouchFx
                     Life = life,
                     MaxLife = life,
                     Thickness = 1.95,
-                    Brush = _random.NextDouble() < 0.7 ? BrightBlueBrush : BlueWhiteBrush
+                    Brush = _random.NextDouble() < 0.7
+                        ? palette.PrimaryArcBrush
+                        : palette.SecondaryArcBrush,
+                    BloomBrush = palette.ArcBloomBrush
                 });
             }
 
@@ -553,8 +645,8 @@ namespace BlueArchiveTouchFx
 
                     dc.PushOpacity(opacity);
                     dc.DrawEllipse(
-                        PulseFillBrush,
-                        PulseStrokePen,
+                        pulse.FillBrush,
+                        pulse.StrokePen,
                         new Point(pulse.X, pulse.Y),
                         pulse.Radius,
                         pulse.Radius);
@@ -570,7 +662,9 @@ namespace BlueArchiveTouchFx
                     double size = particle.Size * (0.82 + lifeRatio * 0.24);
 
                     Brush? fill = particle.IsFilled ? particle.Style.Brush : null;
-                    Pen stroke = particle.IsFilled ? particle.Style.FilledPen : particle.Style.OutlinePen;
+                    Pen stroke = particle.IsFilled
+                        ? particle.Style.FilledPen
+                        : particle.Style.OutlinePen;
 
                     dc.PushOpacity(lifeRatio);
                     dc.PushTransform(new RotateTransform(particle.Rotation, particle.X, particle.Y));
@@ -629,7 +723,7 @@ namespace BlueArchiveTouchFx
                         DrawArcLayer(
                             dc,
                             geometry,
-                            ArcBloomBrush,
+                            arc.BloomBrush,
                             bloomThickness,
                             lifeRatio * taper * 0.22);
 
@@ -655,7 +749,7 @@ namespace BlueArchiveTouchFx
                     return;
                 }
 
-                var pen = new Pen(brush, thickness)
+                Pen pen = new(brush, thickness)
                 {
                     StartLineCap = PenLineCap.Round,
                     EndLineCap = PenLineCap.Round
@@ -666,16 +760,16 @@ namespace BlueArchiveTouchFx
                 dc.Pop();
             }
 
-            private ParticleStyle PickParticleStyle()
+            private ParticleStyle PickParticleStyle(ThemePalette palette)
             {
-                return ParticleStyles[_random.Next(ParticleStyles.Length)];
+                return palette.ParticleStyles[_random.Next(palette.ParticleStyles.Length)];
             }
 
             private static Geometry CreateTriangleGeometry(double x, double y, double size)
             {
                 double half = size / 2.0;
 
-                var geometry = new StreamGeometry();
+                StreamGeometry geometry = new();
 
                 using (StreamGeometryContext context = geometry.Open())
                 {
@@ -709,7 +803,7 @@ namespace BlueArchiveTouchFx
                 Point startPoint = PointOnCircle(centerX, centerY, radius, startAngleDegrees);
                 Point endPoint = PointOnCircle(centerX, centerY, radius, startAngleDegrees + sweepAngleDegrees);
 
-                var geometry = new StreamGeometry();
+                StreamGeometry geometry = new();
 
                 using (StreamGeometryContext context = geometry.Open())
                 {
@@ -719,7 +813,9 @@ namespace BlueArchiveTouchFx
                         new Size(radius, radius),
                         0,
                         Math.Abs(sweepAngleDegrees) > 180,
-                        sweepAngleDegrees >= 0 ? SweepDirection.Clockwise : SweepDirection.Counterclockwise,
+                        sweepAngleDegrees >= 0
+                            ? SweepDirection.Clockwise
+                            : SweepDirection.Counterclockwise,
                         true,
                         false);
                 }
@@ -751,6 +847,38 @@ namespace BlueArchiveTouchFx
                 return Math.Clamp(life / maxLife, 0, 1);
             }
 
+            private static ThemePalette CreateThemePalette(
+                Color[] particleColours,
+                Color pulseFill,
+                Color pulseStroke,
+                Color arcBloom,
+                Color primaryArc,
+                Color secondaryArc)
+            {
+                Brush pulseFillBrush = CreateBrush(pulseFill);
+                Pen pulseStrokePen = CreatePen(pulseStroke, 1.0);
+                Brush arcBloomBrush = CreateBrush(arcBloom);
+                Brush primaryArcBrush = CreateBrush(primaryArc);
+                Brush secondaryArcBrush = CreateBrush(secondaryArc);
+
+                ParticleStyle[] particleStyles = new ParticleStyle[particleColours.Length];
+
+                for (int i = 0; i < particleColours.Length; i++)
+                {
+                    particleStyles[i] = CreateParticleStyle(CreateBrush(particleColours[i]));
+                }
+
+                return new ThemePalette
+                {
+                    PulseFillBrush = pulseFillBrush,
+                    PulseStrokePen = pulseStrokePen,
+                    ArcBloomBrush = arcBloomBrush,
+                    PrimaryArcBrush = primaryArcBrush,
+                    SecondaryArcBrush = secondaryArcBrush,
+                    ParticleStyles = particleStyles
+                };
+            }
+
             private static Brush CreateBrush(Color color)
             {
                 SolidColorBrush brush = new(color);
@@ -779,6 +907,16 @@ namespace BlueArchiveTouchFx
                     OutlinePen = outlinePen,
                     FilledPen = filledPen
                 };
+            }
+
+            private sealed class ThemePalette
+            {
+                public Brush PulseFillBrush { get; init; } = null!;
+                public Pen PulseStrokePen { get; init; } = null!;
+                public Brush ArcBloomBrush { get; init; } = null!;
+                public Brush PrimaryArcBrush { get; init; } = null!;
+                public Brush SecondaryArcBrush { get; init; } = null!;
+                public ParticleStyle[] ParticleStyles { get; init; } = Array.Empty<ParticleStyle>();
             }
 
             private sealed class ParticleStyle
@@ -812,6 +950,8 @@ namespace BlueArchiveTouchFx
                 public double GrowthSpeed { get; set; }
                 public double Life { get; set; }
                 public double MaxLife { get; set; }
+                public Brush FillBrush { get; set; } = null!;
+                public Pen StrokePen { get; set; } = null!;
             }
 
             private sealed class EnergyArc
@@ -828,6 +968,7 @@ namespace BlueArchiveTouchFx
                 public double MaxLife { get; set; }
                 public double Thickness { get; set; }
                 public Brush Brush { get; set; } = null!;
+                public Brush BloomBrush { get; set; } = null!;
             }
         }
 

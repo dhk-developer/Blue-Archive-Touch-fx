@@ -7,7 +7,7 @@ When the user left-clicks, the executable draws a short blue burst effect at the
 ## Features
 
 - Visual click effect inspired (not a 1-1 copy) by Blue Archive's touch fx.
-- Start with Windows toggle#
+- Start with Windows toggle
 - Automatic color modes (Light / Dark)
 - `Ctrl + Alt + Q` emergency quit shortcut if needed.
 - Lightweight rendering using a custom WPF drawing surface

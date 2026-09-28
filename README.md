@@ -42,7 +42,7 @@ By default, the app registers itself to start with Windows when launched. This c
 - **Bounded cost.** Hard caps (32 burst particles, 3 pulses, 3 arcs). Rapid clicking shrinks new bursts instead of stacking them. Brushes, pens and geometry are frozen for cheap redraws.
 - **Theme-aware.** Reads the Windows light/dark setting and uses higher-contrast colours on bright backgrounds.
 
-More context: [case study](https://dhk-developer.github.io/work/touch-fx/).
+Write-up with a screen recording: [dhk-developer.github.io/touch-fx.html](https://dhk-developer.github.io/touch-fx.html).
 
 ## Notes
 
